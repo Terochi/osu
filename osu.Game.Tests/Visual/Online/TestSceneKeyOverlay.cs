@@ -19,7 +19,7 @@ namespace osu.Game.Tests.Visual.Online
         {
             KeyOverlay graph;
 
-            Children = Enumerable.Range(0, 26).Select(i => new KeyOverlay(Key.A + i, Color4.Red)
+            Children = Enumerable.Range(0, 26).Select(i => new KeyOverlay(Key.A + i, Color4.FromHsv(new Vector4(i * 0.039f, 1, 1, 1)))
             {
                 RelativeSizeAxes = Axes.Both,
                 Anchor = Anchor.CentreLeft,
@@ -27,7 +27,7 @@ namespace osu.Game.Tests.Visual.Online
                 Position = new Vector2((i - 14) * 50, 0)
             }).ToArray();
 
-            Add(graph = new KeyOverlay(Key.X, Color4.Red)
+            Add(graph = new KeyOverlay(Key.Semicolon, Color4.Red)
             {
                 RelativeSizeAxes = Axes.Both,
                 Anchor = Anchor.Centre,
@@ -41,12 +41,13 @@ namespace osu.Game.Tests.Visual.Online
             {
                 for (int i = 0; i < 27; i++)
                 {
+                    int j = i;
                     Scheduler.Add(new ScheduledDelegate(() =>
                     {
-                        if (i != 26)
-                            InputManager.PressKey(Key.A + i);
-                        if (i != 0)
-                            InputManager.ReleaseKey(Key.A + i - 1);
+                        if (j != 26)
+                            InputManager.PressKey(Key.A + j);
+                        if (j != 0)
+                            InputManager.ReleaseKey(Key.A + j - 1);
                     }, Time.Current + i * 100));
                 }
             });

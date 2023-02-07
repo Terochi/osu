@@ -1,12 +1,13 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using Humanizer;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Input;
+using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Graphics.Sprites;
 using osuTK;
@@ -22,7 +23,10 @@ namespace osu.Game.Graphics.UserInterface
         private ToggleGraph graph = null!;
         private OsuSpriteText text = null!;
         private Box box = null!;
-        private Color4 color;
+        private readonly Color4 color;
+
+        [Resolved]
+        private ReadableKeyCombinationProvider keyCombinationProvider { get; set; } = null!;
 
         public KeyOverlay(Key targetKey, Color4 innerColor)
         {
@@ -63,8 +67,7 @@ namespace osu.Game.Graphics.UserInterface
                             Origin = Anchor.Centre,
                             Font = OsuFont.Default.With(size: 16, weight: FontWeight.Bold),
                             Colour = Color4.White,
-                            Text = //KeyCombination.FromKey(TargetKey).Humanize()
-                                TargetKey.Humanize()
+                            Text = keyCombinationProvider.GetReadableString(KeyCombination.FromKey(TargetKey))
                         },
                     }
                 },
@@ -76,7 +79,7 @@ namespace osu.Game.Graphics.UserInterface
                     Size = new Vector2(1),
                     Position = new Vector2(0, -30),
                     Direction = BarDirection.BottomToTop,
-                    Colour = ColourInfo.GradientVertical(Color4.Transparent, color)
+                    Colour = ColourInfo.GradientVertical(new Color4(color.R, color.G, color.B, 0f), color)
                 }
             };
         }

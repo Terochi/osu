@@ -114,13 +114,13 @@ namespace osu.Game.Graphics.UserInterface
                 while (Source.timeStamps.Count > 0 && (offset - Source.timeStamps[0]) / timeUntilEnd >= 1)
                     Source.timeStamps.Dequeue();
 
-                float[] timestamps = Source.timeStamps.AsEnumerable().ToArray();
+                //float[] timestamps = Source.timeStamps.AsEnumerable().ToArray();
 
                 bool state = Source.startState ^ (Source.timeStamps.Count % 2 == 1);
 
                 shader.Bind();
 
-                foreach (float timeStamp in timestamps)
+                foreach (float timeStamp in Source.timeStamps.AsEnumerable())
                 {
                     float start = (float)((offset - timeStamp) / timeUntilEnd);
 
