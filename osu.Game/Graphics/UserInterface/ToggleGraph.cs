@@ -16,7 +16,7 @@ namespace osu.Game.Graphics.UserInterface
 {
     public partial class ToggleGraph : Drawable
     {
-        private float timeUntilEnd = 5000;
+        private float timeUntilEnd = 3000;
 
         public float TimeUntilEnd
         {
@@ -47,7 +47,7 @@ namespace osu.Game.Graphics.UserInterface
         }
 
         private bool startState;
-        private readonly LimitedCapacityQueue<float> timeStamps = new LimitedCapacityQueue<float>(50);
+        private readonly LimitedCapacityQueue<float> timeStamps = new LimitedCapacityQueue<float>(100);
 
         private IShader shader = null!;
         private Texture texture = null!;
@@ -64,7 +64,13 @@ namespace osu.Game.Graphics.UserInterface
             if (activated == startState)
                 return;
 
+            bool isFull = timeStamps.Full;
+
             timeStamps.Enqueue((float)Time.Current);
+
+            if (isFull && activated)
+                timeStamps.Dequeue();
+
             startState = activated;
         }
 

@@ -27,6 +27,8 @@ namespace osu.Game.Tests.Visual.Gameplay
                 {
                     testCounter = new KeyCounterKeyboard(Key.X),
                     new KeyCounterKeyboard(Key.X),
+                    new KeyCounterKeyboard(Key.Semicolon),
+                    new KeyCounterKeyboard(Key.Number0),
                     new KeyCounterMouse(MouseButton.Left),
                     new KeyCounterMouse(MouseButton.Right),
                 },
