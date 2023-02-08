@@ -3,7 +3,6 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input;
@@ -79,7 +78,7 @@ namespace osu.Game.Graphics.UserInterface
                     Size = new Vector2(1),
                     Position = new Vector2(0, -30),
                     Direction = BarDirection.BottomToTop,
-                    Colour = ColourInfo.GradientVertical(new Color4(color.R, color.G, color.B, 0f), color)
+                    Colour = color,
                 }
             };
         }

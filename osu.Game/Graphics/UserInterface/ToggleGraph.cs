@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
@@ -114,8 +115,6 @@ namespace osu.Game.Graphics.UserInterface
                 while (Source.timeStamps.Count > 0 && (offset - Source.timeStamps[0]) / timeUntilEnd >= 1)
                     Source.timeStamps.Dequeue();
 
-                //float[] timestamps = Source.timeStamps.AsEnumerable().ToArray();
-
                 bool state = Source.startState ^ (Source.timeStamps.Count % 2 == 1);
 
                 shader.Bind();
@@ -144,10 +143,8 @@ namespace osu.Game.Graphics.UserInterface
                     if (start >= end)
                         return;
 
-                    float width = (direction <= BarDirection.RightToLeft ? end - start : 1);
-                    float barWidth = drawSize.X * width;
-                    float height = (direction >= BarDirection.TopToBottom ? end - start : 1);
-                    float barHeight = drawSize.Y * height;
+                    float width = direction <= BarDirection.RightToLeft ? end - start : 1;
+                    float height = direction >= BarDirection.TopToBottom ? end - start : 1;
 
                     Vector2 topLeft;
 
@@ -155,11 +152,11 @@ namespace osu.Game.Graphics.UserInterface
                     {
                         default:
                         case BarDirection.LeftToRight:
-                            topLeft = new Vector2(1 - start - width, 0);
+                            topLeft = new Vector2(start, 0);
                             break;
 
                         case BarDirection.RightToLeft:
-                            topLeft = new Vector2(start, 0);
+                            topLeft = new Vector2(1 - start - width, 0);
                             break;
 
                         case BarDirection.TopToBottom:
@@ -171,27 +168,67 @@ namespace osu.Game.Graphics.UserInterface
                             break;
                     }
 
-                    Vector2 barTopLeft = new Vector2(topLeft.X * drawSize.X, topLeft.Y * drawSize.Y);
+                    RectangleF rectangle = new RectangleF(topLeft, new Vector2(width, height));
 
-                    Quad quad = new Quad(
-                        Vector2Extensions.Transform(barTopLeft, DrawInfo.Matrix),
-                        Vector2Extensions.Transform(barTopLeft + new Vector2(barWidth, 0), DrawInfo.Matrix),
-                        Vector2Extensions.Transform(barTopLeft + new Vector2(0, barHeight), DrawInfo.Matrix),
-                        Vector2Extensions.Transform(barTopLeft + new Vector2(barWidth, barHeight), DrawInfo.Matrix)
-                    );
+                    // var polygon = createPolygon(quad);
+
+                    // renderer.DrawClipped(ref polygon, texture, getColourInfo(rectangle, direction));
+
                     renderer.DrawQuad(
                         texture,
-                        quad,
-                        new ColourInfo
-                        {
-                            TopLeft = DrawColourInfo.Colour.Interpolate(topLeft),
-                            TopRight = DrawColourInfo.Colour.Interpolate(topLeft + new Vector2(width, 0)),
-                            BottomLeft = DrawColourInfo.Colour.Interpolate(topLeft + new Vector2(0, height)),
-                            BottomRight = DrawColourInfo.Colour.Interpolate(topLeft + new Vector2(width, height))
-                        });
+                        new Quad(
+                            rectangle.X * drawSize.X,
+                            rectangle.Y * drawSize.Y,
+                            rectangle.Width * drawSize.X,
+                            rectangle.Height * drawSize.Y
+                        ) * DrawInfo.Matrix,
+                        getColourInfo(rectangle, direction)
+                    );
                 }
 
                 shader.Unbind();
+            }
+
+            private SimpleConvexPolygon createPolygon(Quad quad, int verticesCount = 20)
+            {
+                Vector2[] vertices = new Vector2[verticesCount];
+
+                float radiusW = quad.Width / 2;
+                float radiusH = quad.Height / 2;
+
+                Vector2 center = quad.TopLeft + new Vector2(radiusW, radiusH);
+
+                float step = 2 * MathHelper.Pi / (verticesCount - 1);
+
+                for (int i = 0; i < verticesCount; i++)
+                {
+                    vertices[i] = center + new Vector2(MathF.Cos(i * step) * radiusW, MathF.Sin(i * step) * radiusH);
+                }
+
+                return new SimpleConvexPolygon(vertices);
+            }
+
+            private ColourInfo getColourInfo(RectangleF rectangle, BarDirection direction)
+            {
+                float top = direction == BarDirection.BottomToTop ? rectangle.Top : direction == BarDirection.TopToBottom ? 1 - rectangle.Top : 0;
+                float bottom = direction == BarDirection.BottomToTop ? rectangle.Bottom : direction == BarDirection.TopToBottom ? 1 - rectangle.Bottom : 0;
+                float left = direction == BarDirection.RightToLeft ? rectangle.Left : direction == BarDirection.LeftToRight ? 1 - rectangle.Left : 0;
+                float right = direction == BarDirection.RightToLeft ? rectangle.Right : direction == BarDirection.LeftToRight ? 1 - rectangle.Right : 0;
+
+                ColourInfo c = new ColourInfo
+                {
+                    TopLeft = DrawColourInfo.Colour.Interpolate(rectangle.TopLeft),
+                    TopRight = DrawColourInfo.Colour.Interpolate(rectangle.TopRight),
+                    BottomLeft = DrawColourInfo.Colour.Interpolate(rectangle.BottomLeft),
+                    BottomRight = DrawColourInfo.Colour.Interpolate(rectangle.BottomRight)
+                };
+
+                c.TopLeft.MultiplyAlpha(top + left);
+                c.TopRight.MultiplyAlpha(top + right);
+                c.BottomLeft.MultiplyAlpha(bottom + left);
+                c.BottomRight.MultiplyAlpha(bottom + right);
+
+                return c;
             }
         }
     }
