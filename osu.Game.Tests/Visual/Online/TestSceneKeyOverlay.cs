@@ -60,11 +60,7 @@ namespace osu.Game.Tests.Visual.Online
 
             void changeDirection(BarDirection direction)
             {
-                //graph.Direction = direction;
-                if (direction <= BarDirection.RightToLeft)
-                    graph.Size = new Vector2(0.9f, 0.1f);
-                else
-                    graph.Size = new Vector2(0.1f, 0.9f);
+                graph.Direction = direction;
             }
         }
     }

@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -19,9 +20,50 @@ namespace osu.Game.Graphics.UserInterface
     {
         public readonly Key TargetKey;
 
+        private BarDirection direction = BarDirection.LeftToRight;
+
+        public BarDirection Direction
+        {
+            get => direction;
+            set
+            {
+                if (direction == value)
+                    return;
+
+                direction = value;
+
+                updateDirection();
+            }
+        }
+
+        private Vector2 directionVector
+        {
+            get
+            {
+                switch (Direction)
+                {
+                    default:
+                    case BarDirection.LeftToRight:
+                        return new Vector2(1, 0);
+
+                    case BarDirection.RightToLeft:
+                        return new Vector2(-1, 0);
+
+                    case BarDirection.TopToBottom:
+                        return new Vector2(0, 1);
+
+                    case BarDirection.BottomToTop:
+                        return new Vector2(0, -1);
+                }
+            }
+        }
+
         private ToggleGraph graph = null!;
+
         private OsuSpriteText text = null!;
+
         private Box box = null!;
+
         private readonly Color4 color;
 
         [Resolved]
@@ -44,12 +86,12 @@ namespace osu.Game.Graphics.UserInterface
             {
                 new Container
                 {
-                    Anchor = Anchor.BottomCentre,
-                    Origin = Anchor.BottomCentre,
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
                     Size = new Vector2(30),
                     Masking = true,
                     BorderColour = Color4.White,
-                    BorderThickness = 4f,
+                    BorderThickness = 3.5f,
                     Children = new Drawable[]
                     {
                         box = new Box
@@ -73,14 +115,24 @@ namespace osu.Game.Graphics.UserInterface
                 graph = new ToggleGraph
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Origin = Anchor.BottomCentre,
-                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.Centre,
+                    Anchor = Anchor.Centre,
                     Size = new Vector2(1),
                     Position = new Vector2(0, -30),
                     Direction = BarDirection.BottomToTop,
                     Colour = color,
                 }
             };
+        }
+
+        private void updateDirection()
+        {
+            Vector2 dir = directionVector;
+            graph.Position = dir * 15;
+            RelativeSizeAxes = (Axes)(int)(Math.Abs(dir.X) + Math.Abs(dir.Y) * 2);
+            Size = new Vector2(Math.Abs(dir.Y) * 29.2f + 0.8f, Math.Abs(dir.X) * 29.2f + 0.8f);
+            graph.Anchor = (Anchor)((int)Math.Pow(2, dir.X + 4) + (int)Math.Pow(2, dir.Y + 1));
+            graph.Direction = direction;
         }
 
         protected override bool OnKeyDown(KeyDownEvent e)
