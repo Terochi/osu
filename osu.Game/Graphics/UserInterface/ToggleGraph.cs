@@ -1,15 +1,16 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shaders;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.Timing;
 using osu.Game.Utils;
 using osuTK;
 
@@ -17,38 +18,14 @@ namespace osu.Game.Graphics.UserInterface
 {
     public partial class ToggleGraph : Drawable
     {
-        private float timeUntilEnd = 3000;
+        public readonly Bindable<float> GraphTimeSpan = new Bindable<float>(3000);
 
-        public float TimeUntilEnd
-        {
-            get => timeUntilEnd;
-            set
-            {
-                if (timeUntilEnd == value)
-                    return;
+        private readonly Bindable<bool> startState = new BindableBool();
 
-                timeUntilEnd = value;
-                Invalidate(Invalidation.DrawNode);
-            }
-        }
-
-        private BarDirection direction = BarDirection.BottomToTop;
-
-        public BarDirection Direction
-        {
-            get => direction;
-            set
-            {
-                if (direction == value)
-                    return;
-
-                direction = value;
-                Invalidate(Invalidation.DrawNode);
-            }
-        }
-
-        private bool startState;
-        private readonly LimitedCapacityQueue<float> timeStamps = new LimitedCapacityQueue<float>(100);
+        /// <summary>
+        /// Queue containing time stamps of all pressed state changes
+        /// </summary>
+        private readonly LimitedCapacityQueue<float> changeTimestamps = new LimitedCapacityQueue<float>(100);
 
         private IShader shader = null!;
         private Texture texture = null!;
@@ -60,19 +37,26 @@ namespace osu.Game.Graphics.UserInterface
             shader = shaders.Load(VertexShaderDescriptor.TEXTURE_2, FragmentShaderDescriptor.TEXTURE);
         }
 
+        protected override void LoadComplete()
+        {
+            GraphTimeSpan.BindValueChanged(_ => Invalidate(Invalidation.DrawNode));
+
+            base.LoadComplete();
+        }
+
         public void SetState(bool activated)
         {
-            if (activated == startState)
+            if (activated == startState.Value)
                 return;
 
-            bool isFull = timeStamps.Full;
+            bool isFull = changeTimestamps.Full;
 
-            timeStamps.Enqueue((float)Time.Current);
+            changeTimestamps.Enqueue((float)Time.Current);
 
             if (isFull && activated)
-                timeStamps.Dequeue();
+                changeTimestamps.Dequeue();
 
-            startState = activated;
+            startState.Value = activated;
         }
 
         protected override DrawNode CreateDrawNode() => new ToggleGraphDrawNode(this);
@@ -81,17 +65,24 @@ namespace osu.Game.Graphics.UserInterface
         {
             public new ToggleGraph Source => (ToggleGraph)base.Source;
 
+            private readonly IFrameBasedClock clock;
+
+            private readonly LimitedCapacityQueue<float> timestamps;
+            private readonly Bindable<bool> pressedState;
+
             public ToggleGraphDrawNode(ToggleGraph source)
                 : base(source)
             {
+                clock = source.Clock;
+                timestamps = source.changeTimestamps;
+                pressedState = source.startState.GetBoundCopy();
             }
 
             private IShader shader = null!;
             private Texture texture = null!;
 
             private Vector2 drawSize;
-            private BarDirection direction;
-            private double timeUntilEnd;
+            private float graphTimeSpan;
 
             public override void ApplyState()
             {
@@ -100,28 +91,29 @@ namespace osu.Game.Graphics.UserInterface
                 shader = Source.shader;
                 texture = Source.texture;
                 drawSize = Source.DrawSize;
-                direction = Source.direction;
-                timeUntilEnd = Source.timeUntilEnd;
+                graphTimeSpan = Source.GraphTimeSpan.Value;
             }
 
             public override void Draw(IRenderer renderer)
             {
                 base.Draw(renderer);
 
-                float offset = (float)Source.Time.Current;
+                float currentTime = (float)clock.CurrentTime;
 
                 float end = 1;
 
-                while (Source.timeStamps.Count > 0 && (offset - Source.timeStamps[0]) / timeUntilEnd >= 1)
-                    Source.timeStamps.Dequeue();
+                while (timestamps.Count > 0 && (currentTime - timestamps[0]) / graphTimeSpan >= 1)
+                    // Remove all timestamps that are out of range
+                    timestamps.Dequeue();
 
-                bool state = Source.startState ^ (Source.timeStamps.Count % 2 == 1);
+                // The pressed state of last timestamp (because we plan to enumerate from oldest to newest)
+                bool state = pressedState.Value ^ (timestamps.Count % 2 == 1);
 
                 shader.Bind();
 
-                foreach (float timeStamp in Source.timeStamps.AsEnumerable())
+                foreach (float timeStamp in timestamps.AsEnumerable())
                 {
-                    float start = (float)((offset - timeStamp) / timeUntilEnd);
+                    float start = (currentTime - timeStamp) / graphTimeSpan;
 
                     state = !state;
 
@@ -132,10 +124,12 @@ namespace osu.Game.Graphics.UserInterface
                         continue;
                     }
 
+                    // Draw when we know the quads start and end relative positions
                     drawBar(start);
                 }
 
-                if (Source.startState)
+                if (pressedState.Value)
+                    // Draw bottom quad because we don't have the end timestamp
                     drawBar(0);
 
                 void drawBar(float start)
@@ -143,79 +137,26 @@ namespace osu.Game.Graphics.UserInterface
                     if (start >= end)
                         return;
 
-                    float width = direction <= BarDirection.RightToLeft ? end - start : 1;
-                    float height = direction >= BarDirection.TopToBottom ? end - start : 1;
-
-                    Vector2 topLeft;
-
-                    switch (direction)
-                    {
-                        default:
-                        case BarDirection.LeftToRight:
-                            topLeft = new Vector2(start, 0);
-                            break;
-
-                        case BarDirection.RightToLeft:
-                            topLeft = new Vector2(1 - start - width, 0);
-                            break;
-
-                        case BarDirection.TopToBottom:
-                            topLeft = new Vector2(0, start);
-                            break;
-
-                        case BarDirection.BottomToTop:
-                            topLeft = new Vector2(0, 1 - start - height);
-                            break;
-                    }
-
-                    RectangleF rectangle = new RectangleF(topLeft, new Vector2(width, height));
-
-                    // var polygon = createPolygon(quad);
-
-                    // renderer.DrawClipped(ref polygon, texture, getColourInfo(rectangle, direction));
+                    RectangleF rectangle = new RectangleF(new Vector2(0, 1 - end), new Vector2(1, end - start));
 
                     renderer.DrawQuad(
                         texture,
                         new Quad(
-                            rectangle.X * drawSize.X,
+                            0, //rectangle.X * drawSize.X
                             rectangle.Y * drawSize.Y,
-                            rectangle.Width * drawSize.X,
+                            drawSize.X, //rectangle.Width * drawSize.X
                             rectangle.Height * drawSize.Y
                         ) * DrawInfo.Matrix,
-                        getColourInfo(rectangle, direction)
+                        getColourInfo(rectangle)
                     );
                 }
 
                 shader.Unbind();
             }
 
-            private SimpleConvexPolygon createPolygon(Quad quad, int verticesCount = 20)
+            private ColourInfo getColourInfo(RectangleF rectangle)
             {
-                Vector2[] vertices = new Vector2[verticesCount];
-
-                float radiusW = quad.Width / 2;
-                float radiusH = quad.Height / 2;
-
-                Vector2 center = quad.TopLeft + new Vector2(radiusW, radiusH);
-
-                float step = 2 * MathHelper.Pi / (verticesCount - 1);
-
-                for (int i = 0; i < verticesCount; i++)
-                {
-                    vertices[i] = center + new Vector2(MathF.Cos(i * step) * radiusW, MathF.Sin(i * step) * radiusH);
-                }
-
-                return new SimpleConvexPolygon(vertices);
-            }
-
-            private ColourInfo getColourInfo(RectangleF rectangle, BarDirection direction)
-            {
-                float top = direction == BarDirection.BottomToTop ? rectangle.Top : direction == BarDirection.TopToBottom ? 1 - rectangle.Top : 0;
-                float bottom = direction == BarDirection.BottomToTop ? rectangle.Bottom : direction == BarDirection.TopToBottom ? 1 - rectangle.Bottom : 0;
-                float left = direction == BarDirection.RightToLeft ? rectangle.Left : direction == BarDirection.LeftToRight ? 1 - rectangle.Left : 0;
-                float right = direction == BarDirection.RightToLeft ? rectangle.Right : direction == BarDirection.LeftToRight ? 1 - rectangle.Right : 0;
-
-                ColourInfo c = new ColourInfo
+                ColourInfo colourInfo = new ColourInfo
                 {
                     TopLeft = DrawColourInfo.Colour.Interpolate(rectangle.TopLeft),
                     TopRight = DrawColourInfo.Colour.Interpolate(rectangle.TopRight),
@@ -223,12 +164,12 @@ namespace osu.Game.Graphics.UserInterface
                     BottomRight = DrawColourInfo.Colour.Interpolate(rectangle.BottomRight)
                 };
 
-                c.TopLeft.MultiplyAlpha(top + left);
-                c.TopRight.MultiplyAlpha(top + right);
-                c.BottomLeft.MultiplyAlpha(bottom + left);
-                c.BottomRight.MultiplyAlpha(bottom + right);
+                colourInfo.TopLeft.MultiplyAlpha(rectangle.Top);
+                colourInfo.TopRight.MultiplyAlpha(rectangle.Top);
+                colourInfo.BottomLeft.MultiplyAlpha(rectangle.Bottom);
+                colourInfo.BottomRight.MultiplyAlpha(rectangle.Bottom);
 
-                return c;
+                return colourInfo;
             }
         }
     }

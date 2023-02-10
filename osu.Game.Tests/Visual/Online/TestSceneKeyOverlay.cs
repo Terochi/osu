@@ -3,9 +3,10 @@
 
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Threading;
-using osu.Game.Graphics.UserInterface;
+using osu.Game.Screens.Play.HUD;
 using osuTK;
 using osuTK.Graphics;
 using osuTK.Input;
@@ -17,51 +18,47 @@ namespace osu.Game.Tests.Visual.Online
     {
         public TestSceneKeyOverlay()
         {
-            KeyOverlay graph;
+            const int key_count = 10;
 
-            Children = Enumerable.Range(0, 26).Select(i => new KeyOverlay(Key.A + i, Color4.FromHsv(new Vector4(i * 0.039f, 1, 1, 1)))
-            {
-                RelativeSizeAxes = Axes.Both,
-                Anchor = Anchor.CentreLeft,
-                Origin = Anchor.Centre,
-                Position = new Vector2((i - 14) * 50, 0)
-            }).ToArray();
+            int offset = 0;
 
-            Add(graph = new KeyOverlay(Key.Semicolon, Color4.Red)
+            KeyOverlay[] overlays;
+
+            Children = overlays = Enumerable.Range(0, key_count).Select(i => new KeyOverlay
             {
+                GraphColour = { Value = Color4.FromHsv(new Vector4((float)i / key_count, 1, 1, 1)) },
+                TargetKey = { Value = (KeyOverlay.OverlayKey)Key.A + i },
                 RelativeSizeAxes = Axes.Both,
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
-                Position = new Vector2(50 * 13, 0)
+                Position = new Vector2((i - key_count / 2) * 50, 0)
+            }).ToArray();
+
+            AddSliderStep("Time spans", 1000f, 5000f, 1000f, val =>
+                overlays.ForEach(o => o.TimeSpan.Value = val));
+
+            AddSliderStep("Colours", 0f, 0.99f, 0f, val =>
+                overlays.ForEach(o => o.GraphColour.Value = Color4.FromHsv(new Vector4(val, 1, 1, 1))));
+
+            AddSliderStep("Keys", 0, 26 - key_count, 0, val =>
+            {
+                offset = val;
+
+                for (int i = 0; i < key_count; i++)
+                    overlays[i].TargetKey.Value = (KeyOverlay.OverlayKey)Key.A + i + offset;
             });
 
-            AddStep("Do nothing", () => { });
-
-            AddStep("Weeeee", () =>
+            AddStep("Animation", () =>
             {
-                for (int i = 0; i < 27; i++)
+                for (int i = 0; i < key_count; i++)
                 {
                     int j = i;
-                    Scheduler.Add(new ScheduledDelegate(() =>
-                    {
-                        if (j != 26)
-                            InputManager.PressKey(Key.A + j);
-                        if (j != 0)
-                            InputManager.ReleaseKey(Key.A + j - 1);
-                    }, Time.Current + i * 100));
+
+                    Scheduler.Add(new ScheduledDelegate(() => InputManager.PressKey(Key.A + j + offset), Time.Current + j * 100));
+
+                    Scheduler.Add(new ScheduledDelegate(() => InputManager.ReleaseKey(Key.A + j + offset), Time.Current + (j + 1) * 100));
                 }
             });
-
-            AddStep("Bottom to top", () => changeDirection(BarDirection.BottomToTop));
-            AddStep("Top to bottom", () => changeDirection(BarDirection.TopToBottom));
-            AddStep("Left to right", () => changeDirection(BarDirection.LeftToRight));
-            AddStep("Right to left", () => changeDirection(BarDirection.RightToLeft));
-            AddStep("Change size", () => graph.Size = new Vector2(0.2f));
-
-            void changeDirection(BarDirection direction)
-            {
-                graph.Direction = direction;
-            }
         }
     }
 }
