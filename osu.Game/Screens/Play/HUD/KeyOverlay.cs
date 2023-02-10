@@ -25,7 +25,7 @@ namespace osu.Game.Screens.Play.HUD
         [SettingSource("Target key")]
         public Bindable<OverlayKey> TargetKey { get; set; } = new Bindable<OverlayKey>(OverlayKey.X);
 
-        [SettingSource("Time span", "How long it takes to get from start to end in milliseconds")]
+        // [SettingSource("Time span", "How long it takes to get from start to end in milliseconds")]
         public Bindable<float> TimeSpan { get; private set; } = null!;
 
         public enum OverlayKey
@@ -38,7 +38,7 @@ namespace osu.Game.Screens.Play.HUD
         private OsuSpriteText text = null!;
         private Box box = null!;
 
-        public Bindable<Color4> GraphColour = new Bindable<Color4>();
+        public Bindable<Color4> GraphColour = new Bindable<Color4>(Color4.White);
 
         [Resolved]
         private ReadableKeyCombinationProvider keyCombinationProvider { get; set; } = null!;
